@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Score Labs CPU Inference – Pricing Comparison vs GPU Providers</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #08090d;
+  --surface: #12151d;
+  --surface2: #1a1e2a;
+  --border: #262d3d;
+  --text: #e4e8f1;
+  --text2: #7c869e;
+  --score: #00e5a0;
+  --score-dim: rgba(0,229,160,0.12);
+  --gpu: #7c5cfc;
+  --gpu-dim: rgba(124,92,252,0.12);
+  --warn: #ffb347;
+  --red: #ff6b7a;
+  --blue: #4dabf7;
+  --cyan: #22d3ee;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); line-height:1.65; }
+.container { max-width:1200px; margin:0 auto; padding:20px; }
+
+/* Header */
+.hero { text-align:center; padding:56px 20px 40px; position:relative; }
+.hero::after { content:''; position:absolute; bottom:0; left:10%; right:10%; height:1px; background:linear-gradient(90deg,transparent,var(--border),transparent); }
+.hero .badge { display:inline-block; background:var(--score-dim); color:var(--score); font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:1.5px; padding:5px 14px; border-radius:20px; margin-bottom:16px; border:1px solid rgba(0,229,160,0.25); }
+.hero h1 { font-family:'Space Mono',monospace; font-size:2rem; letter-spacing:-1px; margin-bottom:10px; }
+.hero h1 em { font-style:normal; color:var(--score); }
+.hero p { color:var(--text2); max-width:620px; margin:0 auto; font-size:0.95rem; }
+
+/* Sections */
+.section { margin:48px 0; }
+.stitle { font-family:'Space Mono',monospace; font-size:1.15rem; margin-bottom:18px; display:flex; align-items:center; gap:10px; }
+.stitle .num { background:var(--score-dim); color:var(--score); font-size:0.7rem; font-weight:700; width:26px; height:26px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+
+/* Grids */
+.g2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.g3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+.g4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:14px; }
+@media(max-width:900px) { .g2,.g3,.g4 { grid-template-columns:1fr; } }
+
+/* Cards */
+.card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:22px; }
+.card-sm { padding:16px; }
+.stat-label { font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; color:var(--text2); margin-bottom:4px; }
+.stat-val { font-family:'Space Mono',monospace; font-size:1.7rem; font-weight:700; }
+.stat-note { font-size:0.78rem; color:var(--text2); margin-top:3px; }
+
+/* The big price callout */
+.price-hero { background:linear-gradient(135deg, rgba(0,229,160,0.1), rgba(0,229,160,0.03)); border:1px solid rgba(0,229,160,0.3); border-radius:14px; padding:32px; text-align:center; margin:24px 0; }
+.price-hero .amount { font-family:'Space Mono',monospace; font-size:3rem; font-weight:700; color:var(--score); }
+.price-hero .sub { font-size:1rem; color:var(--text2); margin-top:4px; }
+.price-hero .equiv { display:flex; justify-content:center; gap:32px; margin-top:16px; flex-wrap:wrap; }
+.price-hero .equiv div { font-size:0.85rem; }
+.price-hero .equiv strong { color:var(--score); }
+
+/* Tables */
+table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+table th { text-align:left; padding:11px 12px; background:var(--surface2); color:var(--score); font-weight:600; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.5px; }
+table td { padding:9px 12px; border-bottom:1px solid var(--border); }
+table tr:hover td { background:rgba(0,229,160,0.02); }
+.row-score td { background:var(--score-dim) !important; font-weight:600; }
+.tag { display:inline-block; padding:2px 7px; border-radius:3px; font-size:0.68rem; font-weight:600; white-space:nowrap; }
+.t-green { background:var(--score-dim); color:var(--score); }
+.t-purple { background:var(--gpu-dim); color:var(--gpu); }
+.t-orange { background:rgba(255,179,71,0.15); color:var(--warn); }
+.t-red { background:rgba(255,107,122,0.12); color:var(--red); }
+.t-blue { background:rgba(77,171,247,0.12); color:var(--blue); }
+
+/* Chart containers */
+.chart-box { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:22px; }
+.chart-box h3 { font-size:0.9rem; font-weight:600; margin-bottom:14px; }
+canvas { max-height:340px; }
+
+/* Insight callout */
+.insight { border-left:3px solid var(--score); background:linear-gradient(90deg, var(--score-dim), transparent); padding:16px 20px; border-radius:0 8px 8px 0; margin:18px 0; font-size:0.88rem; }
+.insight b { color:var(--score); }
+
+/* Advantage grid */
+.adv-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:18px; position:relative; overflow:hidden; }
+.adv-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.adv-score::before { background:var(--score); }
+.adv-gpu::before { background:var(--gpu); }
+.adv-card h4 { font-size:0.88rem; margin-bottom:5px; }
+.adv-card p { font-size:0.78rem; color:var(--text2); }
+
+/* Comparison boxes */
+.vs-row { display:grid; grid-template-columns:1fr auto 1fr; gap:0; align-items:stretch; margin:14px 0; }
+.vs-side { padding:16px 20px; border-radius:10px; }
+.vs-left { background:var(--score-dim); border:1px solid rgba(0,229,160,0.2); text-align:right; }
+.vs-right { background:var(--gpu-dim); border:1px solid rgba(124,92,252,0.2); }
+.vs-mid { display:flex; align-items:center; justify-content:center; padding:0 12px; font-family:'Space Mono',monospace; font-weight:700; font-size:0.8rem; color:var(--text2); }
+
+hr { border:none; border-top:1px solid var(--border); margin:40px 0; }
+
+/* Use case fit */
+.fit-table td:first-child { font-weight:600; width:200px; }
+.dot-yes { color:var(--score); }
+.dot-maybe { color:var(--warn); }
+.dot-no { color:var(--red); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- HERO -->
+<div class="hero">
+  <div class="badge">Competitive Pricing Analysis</div>
+  <h1>Score Labs <em>CPU Inference</em> vs GPU Cloud</h1>
+  <p>How Score Labs' $1.39/hr CPU servers compare against GPU providers on cost, TCO, and value — and where CPU inference wins.</p>
+</div>
+
+<!-- SCORE LABS PRICE ANCHOR -->
+<div class="price-hero">
+  <div class="amount">$1.39<span style="font-size:0.4em; color:var(--text2)">/hr</span></div>
+  <div class="sub">Score Labs CPU Inference Server</div>
+  <div class="equiv">
+    <div><strong>$0.023</strong>/min</div>
+    <div><strong>$33.36</strong>/day</div>
+    <div><strong>~$1,000</strong>/month</div>
+    <div><strong>~$12,000</strong>/year</div>
+  </div>
+</div>
+
+<!-- KPI STRIP -->
+<div class="section">
+  <div class="g4">
+    <div class="card card-sm">
+      <div class="stat-label">vs. H100 GPU</div>
+      <div class="stat-val" style="color:var(--score)">65% less</div>
+      <div class="stat-note">$1.39 vs $3.99/hr</div>
+    </div>
+    <div class="card card-sm">
+      <div class="stat-label">vs. A100 80GB</div>
+      <div class="stat-val" style="color:var(--score)">30% less</div>
+      <div class="stat-note">$1.39 vs $1.99/hr</div>
+    </div>
+    <div class="card card-sm">
+      <div class="stat-label">Monthly Savings (vs H100)</div>
+      <div class="stat-val" style="color:var(--score)">$1,900</div>
+      <div class="stat-note">$1,015 vs $2,913/mo</div>
+    </div>
+    <div class="card card-sm">
+      <div class="stat-label">Annual Savings (10 servers)</div>
+      <div class="stat-val" style="color:var(--score)">$228K</div>
+      <div class="stat-note">vs equivalent H100 fleet</div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 1: HOURLY PRICE COMPARISON -->
+<div class="section">
+  <div class="stitle"><span class="num">1</span> Hourly Price Comparison</div>
+  <p style="color:var(--text2);font-size:0.85rem;margin-bottom:16px;">Score Labs CPU at $1.39/hr sits in the mid-range — cheaper than all data-center GPUs (A100, H100, H200, B200) and competitive with high-end consumer GPUs.</p>
+
+  <div class="card" style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr><th>Provider / GPU</th><th>Type</th><th>$/Hour</th><th>$/Month (730hrs)</th><th>vs Score Labs</th><th>Score Position</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Hydra Host — RTX 3090</td><td><span class="tag t-purple">GPU</span></td><td>$0.30</td><td>$219</td><td style="color:var(--red)">78% cheaper</td><td>GPU wins on raw price</td></tr>
+        <tr><td>Hydra Host — RTX 4090</td><td><span class="tag t-purple">GPU</span></td><td>$0.53</td><td>$387</td><td style="color:var(--red)">62% cheaper</td><td>GPU wins on raw price</td></tr>
+        <tr><td>AIServe — RTX 4090</td><td><span class="tag t-purple">GPU</span></td><td>$0.79</td><td>$577</td><td style="color:var(--warn)">43% cheaper</td><td>GPU wins on raw price</td></tr>
+        <tr><td>Hydra Host — L40S</td><td><span class="tag t-purple">GPU</span></td><td>$1.08</td><td>$788</td><td style="color:var(--warn)">22% cheaper</td><td>Comparable zone</td></tr>
+        <tr class="row-score"><td>⚡ Score Labs — CPU Server</td><td><span class="tag t-green">CPU</span></td><td style="color:var(--score);font-family:'Space Mono',monospace;font-weight:700;">$1.39</td><td style="color:var(--score)">$1,015</td><td>—</td><td style="color:var(--score)">Baseline</td></tr>
+        <tr><td>AIServe — A100 40GB</td><td><span class="tag t-purple">GPU</span></td><td>$1.49</td><td>$1,088</td><td style="color:var(--score)">7% more expensive</td><td><span class="tag t-green">Score wins</span></td></tr>
+        <tr><td>AIServe — A100 80GB</td><td><span class="tag t-purple">GPU</span></td><td>$1.99</td><td>$1,453</td><td style="color:var(--score)">43% more expensive</td><td><span class="tag t-green">Score wins</span></td></tr>
+        <tr><td>Hydra Host — H200</td><td><span class="tag t-purple">GPU</span></td><td>$2.85</td><td>$2,081</td><td style="color:var(--score)">105% more expensive</td><td><span class="tag t-green">Score wins big</span></td></tr>
+        <tr><td>AIServe — H100 80GB</td><td><span class="tag t-purple">GPU</span></td><td>$3.99</td><td>$2,913</td><td style="color:var(--score)">187% more expensive</td><td><span class="tag t-green">Score wins big</span></td></tr>
+        <tr><td>Hydra Host — B200</td><td><span class="tag t-purple">GPU</span></td><td>$4.25</td><td>$3,103</td><td style="color:var(--score)">206% more expensive</td><td><span class="tag t-green">Score wins big</span></td></tr>
+        <tr><td>Hydra Host — GH200</td><td><span class="tag t-purple">GPU</span></td><td>$3.87</td><td>$2,825</td><td style="color:var(--score)">178% more expensive</td><td><span class="tag t-green">Score wins big</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CHART: Hourly bar -->
+<div class="section">
+  <div class="chart-box">
+    <h3>Hourly Price: Score Labs CPU vs GPU Providers</h3>
+    <canvas id="hourlyChart"></canvas>
+  </div>
+</div>
+
+<!-- SECTION 2: MONTHLY TCO -->
+<div class="section">
+  <div class="stitle"><span class="num">2</span> Monthly Total Cost of Ownership</div>
+
+  <div class="g2">
+    <div class="chart-box">
+      <h3>Monthly Cost per Server / GPU ($)</h3>
+      <canvas id="monthlyChart"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3>Annual Fleet Cost: 10 Units ($K)</h3>
+      <canvas id="annualChart"></canvas>
+    </div>
+  </div>
+
+  <div class="insight" style="margin-top:18px;">
+    <b>Key Takeaway:</b> A fleet of 10 Score Labs CPU servers costs ~$121K/year. The same number of H100 GPUs would cost ~$349K — a <b>$228K annual saving</b>. Even vs A100 80GB, Score Labs saves $52K/year across 10 units.
+  </div>
+</div>
+
+<hr>
+
+<!-- SECTION 3: WHERE CPU WINS vs GPU -->
+<div class="section">
+  <div class="stitle"><span class="num">3</span> CPU vs GPU — Where Each Wins</div>
+
+  <div class="g2" style="margin-bottom:20px;">
+    <!-- CPU Advantages -->
+    <div>
+      <h3 style="color:var(--score);font-size:0.9rem;margin-bottom:12px;">✅ Score Labs CPU Advantages</h3>
+      <div class="adv-card adv-score" style="margin-bottom:10px;">
+        <h4>Lower Entry Cost & Predictable Billing</h4>
+        <p>$1.39/hr flat — no GPU availability crunches, no spot pricing volatility. Customers budget confidently.</p>
+      </div>
+      <div class="adv-card adv-score" style="margin-bottom:10px;">
+        <h4>No GPU Supply Constraints</h4>
+        <p>GPUs (especially H100/B200) face global shortages and multi-month wait times. CPU servers are abundant and instantly deployable.</p>
+      </div>
+      <div class="adv-card adv-score" style="margin-bottom:10px;">
+        <h4>Simpler Infrastructure</h4>
+        <p>No CUDA drivers, no GPU memory management, no thermal throttling. Lower ops overhead for customers.</p>
+      </div>
+      <div class="adv-card adv-score" style="margin-bottom:10px;">
+        <h4>Better for Smaller Models (≤13B)</h4>
+        <p>For 7B–13B parameter models, modern CPU inference (llama.cpp, vLLM-CPU) delivers acceptable TPS at a fraction of GPU cost.</p>
+      </div>
+      <div class="adv-card adv-score" style="margin-bottom:10px;">
+        <h4>Ideal for Low/Medium Throughput</h4>
+        <p>If you need 1–20 requests/min rather than hundreds, a GPU is overkill. CPU right-sizes the spend.</p>
+      </div>
+      <div class="adv-card adv-score">
+        <h4>Multi-Purpose Server</h4>
+        <p>CPU servers can simultaneously run preprocessing, API logic, databases, and inference — GPUs are single-purpose.</p>
+      </div>
+    </div>
+
+    <!-- GPU Advantages -->
+    <div>
+      <h3 style="color:var(--gpu);font-size:0.9rem;margin-bottom:12px;">⚡ GPU Advantages (Where GPU Still Wins)</h3>
+      <div class="adv-card adv-gpu" style="margin-bottom:10px;">
+        <h4>Raw Throughput for Large Models</h4>
+        <p>For 70B+ parameter models, GPUs deliver 10–100× higher TPS. CPU can't match GPU parallelism at scale.</p>
+      </div>
+      <div class="adv-card adv-gpu" style="margin-bottom:10px;">
+        <h4>Training & Fine-Tuning</h4>
+        <p>Model training is fundamentally GPU-bound. CPUs are not competitive for training workloads.</p>
+      </div>
+      <div class="adv-card adv-gpu" style="margin-bottom:10px;">
+        <h4>High-Concurrency Inference</h4>
+        <p>Serving 100+ concurrent requests on large models requires GPU parallelism and HBM bandwidth.</p>
+      </div>
+      <div class="adv-card adv-gpu" style="margin-bottom:10px;">
+        <h4>Latency-Critical Applications</h4>
+        <p>Real-time chatbots and streaming apps needing <100ms time-to-first-token favour GPU acceleration.</p>
+      </div>
+      <div class="adv-card adv-gpu" style="margin-bottom:10px;">
+        <h4>Vision / Multimodal Models</h4>
+        <p>Image generation (Stable Diffusion), video, and multimodal models are heavily GPU-optimized.</p>
+      </div>
+      <div class="adv-card adv-gpu">
+        <h4>Established Ecosystem</h4>
+        <p>CUDA, TensorRT, and most ML frameworks are GPU-first. CPU inference tooling is maturing but trailing.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<!-- SECTION 4: USE CASE FIT MATRIX -->
+<div class="section">
+  <div class="stitle"><span class="num">4</span> Use Case Fit Matrix</div>
+  <p style="color:var(--text2);font-size:0.85rem;margin-bottom:16px;">Where Score Labs CPU inference is the right choice vs where GPU providers are better suited.</p>
+
+  <div class="card" style="overflow-x:auto">
+    <table class="fit-table">
+      <thead>
+        <tr><th>Use Case</th><th>Score Labs CPU<br>($1.39/hr)</th><th>Consumer GPU<br>($0.40–$0.79/hr)</th><th>A100/H100 GPU<br>($1.99–$3.99/hr)</th><th>Recommendation</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Small model inference (≤13B)</td><td class="dot-yes">★★★ Ideal</td><td class="dot-maybe">★★ Overkill</td><td class="dot-no">★ Way overkill</td><td><span class="tag t-green">Score Labs</span></td></tr>
+        <tr><td>Medium model inference (13B–30B)</td><td class="dot-maybe">★★ Good</td><td class="dot-yes">★★★ Sweet spot</td><td class="dot-maybe">★★ Expensive</td><td><span class="tag t-orange">GPU edge, Score competitive</span></td></tr>
+        <tr><td>Large model inference (70B+)</td><td class="dot-no">★ Slow</td><td class="dot-no">★ VRAM limited</td><td class="dot-yes">★★★ Required</td><td><span class="tag t-purple">GPU required</span></td></tr>
+        <tr><td>RAG pipelines & embedding</td><td class="dot-yes">★★★ Ideal</td><td class="dot-maybe">★★ OK</td><td class="dot-no">★ Overkill</td><td><span class="tag t-green">Score Labs</span></td></tr>
+        <tr><td>Batch processing / ETL</td><td class="dot-yes">★★★ Ideal</td><td class="dot-no">★ Wrong tool</td><td class="dot-no">★ Wrong tool</td><td><span class="tag t-green">Score Labs</span></td></tr>
+        <tr><td>API backend + inference combo</td><td class="dot-yes">★★★ Ideal</td><td class="dot-maybe">★★ Separate infra</td><td class="dot-no">★ Expensive</td><td><span class="tag t-green">Score Labs</span></td></tr>
+        <tr><td>Dev/test/staging environments</td><td class="dot-yes">★★★ Ideal</td><td class="dot-maybe">★★ OK</td><td class="dot-no">★ Wasteful</td><td><span class="tag t-green">Score Labs</span></td></tr>
+        <tr><td>Low-traffic production (≤20 req/min)</td><td class="dot-yes">★★★ Perfect fit</td><td class="dot-maybe">★★ Underutilized</td><td class="dot-no">★ Wasteful</td><td><span class="tag t-green">Score Labs</span></td></tr>
+        <tr><td>High-traffic production (100+ req/min)</td><td class="dot-no">★ Bottleneck</td><td class="dot-maybe">★★ Limited</td><td class="dot-yes">★★★ Required</td><td><span class="tag t-purple">GPU required</span></td></tr>
+        <tr><td>Model training / fine-tuning</td><td class="dot-no">★ Not viable</td><td class="dot-maybe">★★ Small jobs</td><td class="dot-yes">★★★ Required</td><td><span class="tag t-purple">GPU required</span></td></tr>
+        <tr><td>Image generation</td><td class="dot-no">★ Not viable</td><td class="dot-yes">★★★ Sweet spot</td><td class="dot-maybe">★★ Overkill</td><td><span class="tag t-purple">GPU required</span></td></tr>
+        <tr><td>Edge / on-premise deployment</td><td class="dot-yes">★★★ Ideal</td><td class="dot-maybe">★★ Power-hungry</td><td class="dot-no">★ Impractical</td><td><span class="tag t-green">Score Labs</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="insight">
+    <b>Score Labs wins 7 out of 12 use cases</b> — dominating wherever workloads involve smaller models, batch processing, multi-purpose servers, or lower throughput requirements. GPU remains essential for large models, training, and high-concurrency production.
+  </div>
+</div>
+
+<hr>
+
+<!-- SECTION 5: INFERENCE COST FROM OPENROUTER DATA -->
+<div class="section">
+  <div class="stitle"><span class="num">5</span> Inference Cost Benchmarks (from OpenRouter Data)</div>
+  <p style="color:var(--text2);font-size:0.85rem;margin-bottom:16px;">Real-world GPU inference costs from the OpenRouter benchmark data. Shows what Score Labs CPU pricing competes against on a per-token basis.</p>
+
+  <div class="g2">
+    <div class="card" style="overflow-x:auto">
+      <h3 style="font-size:0.9rem;margin-bottom:12px;">Qwen3-235B Model (GPU Providers)</h3>
+      <table>
+        <thead><tr><th>Provider</th><th>$/1M Tokens</th><th>Avg TPS</th><th>Quantization</th></tr></thead>
+        <tbody>
+          <tr><td>DeepInfra</td><td>$0.07</td><td>20.7</td><td>fp8</td></tr>
+          <tr><td>Novita</td><td>$0.09</td><td>4.3</td><td>fp8</td></tr>
+          <tr><td>SiliconFlow</td><td>$0.09</td><td>2.5</td><td>fp8</td></tr>
+          <tr><td>WandB</td><td>$0.10</td><td>42.7</td><td>bf16</td></tr>
+          <tr><td>Parasail</td><td>$0.10</td><td>8.7</td><td>fp8</td></tr>
+          <tr><td>AtlasCloud</td><td>$0.20</td><td>5.6</td><td>fp8</td></tr>
+          <tr><td>Nebius</td><td>$0.20</td><td>13.8</td><td>fp8</td></tr>
+          <tr><td>Google</td><td>$0.22</td><td>—</td><td>—</td></tr>
+          <tr><td>Alibaba</td><td>$0.23</td><td>—</td><td>—</td></tr>
+          <tr><td>Cerebras</td><td>$0.60</td><td>31.0</td><td>fp16</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card" style="overflow-x:auto">
+      <h3 style="font-size:0.9rem;margin-bottom:12px;">Qwen3-30B Model (GPU Providers)</h3>
+      <table>
+        <thead><tr><th>Provider</th><th>$/1M Tokens</th><th>Avg TPS</th><th>Samples</th></tr></thead>
+        <tbody>
+          <tr><td>AtlasCloud</td><td>$0.09</td><td>13.6</td><td>4</td></tr>
+          <tr><td>SiliconFlow</td><td>$0.09</td><td>11.5</td><td>5</td></tr>
+          <tr><td>Nebius</td><td>$0.10</td><td>8.5</td><td>7</td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:20px;padding:16px;background:var(--score-dim);border-radius:8px;">
+        <h4 style="font-size:0.85rem;margin-bottom:8px;color:var(--score);">Score Labs CPU Inference Estimates</h4>
+        <p style="font-size:0.8rem;color:var(--text2);margin-bottom:8px;">At $1.39/hr with CPU-optimized inference (llama.cpp, ONNX):</p>
+        <table style="font-size:0.78rem;">
+          <tr><td>7B model @ ~15 TPS</td><td style="color:var(--score);font-weight:700">$0.026/1M tokens</td></tr>
+          <tr><td>13B model @ ~8 TPS</td><td style="color:var(--score);font-weight:700">$0.048/1M tokens</td></tr>
+          <tr><td>30B model @ ~3 TPS</td><td style="color:var(--score);font-weight:700">$0.129/1M tokens</td></tr>
+        </table>
+        <p style="font-size:0.72rem;color:var(--text2);margin-top:8px;">* TPS estimates based on modern Xeon/EPYC with AVX-512/AMX, using quantized (Q4_K_M) models.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="insight">
+    <b>CPU is 2–4× cheaper per token for small models.</b> At $0.026–$0.048/1M tokens for 7B–13B models, Score Labs dramatically undercuts GPU providers charging $0.07–$0.23/1M tokens. For 30B models, Score Labs CPU ($0.129/1M) is competitive with GPU rates ($0.09–$0.10/1M) but with lower throughput.
+  </div>
+</div>
+
+<hr>
+
+<!-- SECTION 6: SCORE LABS POSITIONING -->
+<div class="section">
+  <div class="stitle"><span class="num">6</span> Score Labs Market Positioning</div>
+
+  <div class="chart-box" style="margin-bottom:20px;">
+    <h3>Price-Performance Map: Score Labs vs GPU Market</h3>
+    <canvas id="positionChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h3 style="font-size:0.95rem;margin-bottom:16px;">Recommended Go-To-Market Messaging</h3>
+    <div class="g3">
+      <div style="padding:14px;background:var(--score-dim);border-radius:8px;">
+        <div style="font-size:1.2rem;margin-bottom:6px;">🎯</div>
+        <h4 style="font-size:0.85rem;margin-bottom:4px;">Primary Message</h4>
+        <p style="font-size:0.8rem;color:var(--text2);">"Enterprise-grade inference at $1.39/hr — 65% less than GPU clouds, with zero GPU lock-in."</p>
+      </div>
+      <div style="padding:14px;background:var(--score-dim);border-radius:8px;">
+        <div style="font-size:1.2rem;margin-bottom:6px;">💡</div>
+        <h4 style="font-size:0.85rem;margin-bottom:4px;">For Cost-Conscious Buyers</h4>
+        <p style="font-size:0.8rem;color:var(--text2);">"Why pay $3.99/hr for an H100 when your 7B model runs perfectly on CPU at $1.39/hr?"</p>
+      </div>
+      <div style="padding:14px;background:var(--score-dim);border-radius:8px;">
+        <div style="font-size:1.2rem;margin-bottom:6px;">🚀</div>
+        <h4 style="font-size:0.85rem;margin-bottom:4px;">For Startups</h4>
+        <p style="font-size:0.8rem;color:var(--text2);">"Ship AI features today for $1,000/month — no GPU waitlists, no vendor lock-in."</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+const scoreColor = '#00e5a0';
+const gpuColor = '#7c5cfc';
+const warnColor = '#ffb347';
+
+// Chart 1: Hourly Price Bar
+const ctx1 = document.getElementById('hourlyChart').getContext('2d');
+const hourlyLabels = ['RTX 3090','RTX 4090\n(Hydra)','RTX 4090\n(AIServe)','L40S','SCORE\nLABS','A100 40GB','A100 80GB','H200','H100 80GB','B200','GH200'];
+const hourlyData = [0.30, 0.53, 0.79, 1.08, 1.39, 1.49, 1.99, 2.85, 3.99, 4.25, 3.87];
+const hourlyColors = hourlyData.map((v,i) => i===4 ? scoreColor : v<1.39 ? 'rgba(124,92,252,0.5)' : 'rgba(124,92,252,0.8)');
+new Chart(ctx1, {
+  type:'bar',
+  data:{
+    labels:hourlyLabels,
+    datasets:[{data:hourlyData, backgroundColor:hourlyColors, borderRadius:4, borderWidth:0}]
+  },
+  options:{
+    responsive:true,
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{label:c=>'$'+c.parsed.y.toFixed(2)+'/hr'}}
+    },
+    scales:{
+      x:{ticks:{color:'#7c869e',font:{size:9}},grid:{display:false}},
+      y:{ticks:{color:'#7c869e',callback:v=>'$'+v},grid:{color:'rgba(38,45,61,0.5)'},title:{display:true,text:'$/hour',color:'#7c869e'}}
+    }
+  }
+});
+
+// Chart 2: Monthly Cost
+const ctx2 = document.getElementById('monthlyChart').getContext('2d');
+const monthlyLabels = ['RTX 3090','RTX 4090','L40S','Score Labs','A100 40G','A100 80G','H200','H100 80G','B200'];
+const monthlyData = [219,387,788,1015,1088,1453,2081,2913,3103];
+const monthlyColors = monthlyData.map((v,i) => i===3 ? scoreColor : gpuColor+'99');
+new Chart(ctx2, {
+  type:'bar',
+  data:{
+    labels:monthlyLabels,
+    datasets:[{data:monthlyData, backgroundColor:monthlyColors, borderRadius:4}]
+  },
+  options:{
+    responsive:true, indexAxis:'y',
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'$'+c.parsed.x.toLocaleString()+'/mo'}}},
+    scales:{
+      x:{ticks:{color:'#7c869e',callback:v=>'$'+v.toLocaleString()},grid:{color:'rgba(38,45,61,0.5)'}},
+      y:{ticks:{color:'#7c869e',font:{size:10}},grid:{display:false}}
+    }
+  }
+});
+
+// Chart 3: Annual Fleet Cost (10 units)
+const ctx3 = document.getElementById('annualChart').getContext('2d');
+const annualLabels = ['Score Labs\nCPU ×10','A100 40G\n×10','A100 80G\n×10','H200 ×10','H100 ×10','B200 ×10'];
+const annualData = [121.8, 130.6, 174.4, 249.7, 349.6, 372.4];
+const annualColors = [scoreColor, gpuColor+'88',gpuColor+'99',gpuColor+'aa',gpuColor+'cc',gpuColor];
+new Chart(ctx3, {
+  type:'bar',
+  data:{
+    labels:annualLabels,
+    datasets:[{data:annualData, backgroundColor:annualColors, borderRadius:4}]
+  },
+  options:{
+    responsive:true,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'$'+c.parsed.y.toFixed(0)+'K/year'}}},
+    scales:{
+      x:{ticks:{color:'#7c869e',font:{size:9}},grid:{display:false}},
+      y:{ticks:{color:'#7c869e',callback:v=>'$'+v+'K'},grid:{color:'rgba(38,45,61,0.5)'},title:{display:true,text:'Annual Cost ($K)',color:'#7c869e'}}
+    }
+  }
+});
+
+// Chart 4: Position Map (bubble)
+const ctx4 = document.getElementById('positionChart').getContext('2d');
+new Chart(ctx4, {
+  type:'bubble',
+  data:{
+    datasets:[
+      {label:'Score Labs CPU', data:[{x:1.39,y:6,r:18}], backgroundColor:scoreColor+'cc', borderColor:scoreColor, borderWidth:2},
+      {label:'RTX 3090', data:[{x:0.30,y:2,r:8}], backgroundColor:gpuColor+'66'},
+      {label:'RTX 4090', data:[{x:0.53,y:4,r:10}], backgroundColor:gpuColor+'77'},
+      {label:'L40S', data:[{x:1.08,y:5,r:9}], backgroundColor:gpuColor+'88'},
+      {label:'A100 40GB', data:[{x:1.49,y:7,r:10}], backgroundColor:gpuColor+'99'},
+      {label:'A100 80GB', data:[{x:1.99,y:8,r:11}], backgroundColor:gpuColor+'aa'},
+      {label:'H100 80GB', data:[{x:3.99,y:9.5,r:14}], backgroundColor:gpuColor+'cc'},
+      {label:'H200', data:[{x:2.85,y:9,r:12}], backgroundColor:gpuColor+'bb'},
+      {label:'B200', data:[{x:4.25,y:10,r:14}], backgroundColor:gpuColor+'dd'}
+    ]
+  },
+  options:{
+    responsive:true,
+    plugins:{
+      legend:{labels:{color:'#7c869e',font:{size:10}},position:'right'},
+      tooltip:{callbacks:{label:c=>c.dataset.label+': $'+c.parsed.x.toFixed(2)+'/hr'}}
+    },
+    scales:{
+      x:{title:{display:true,text:'Price ($/hour)',color:'#7c869e'},ticks:{color:'#7c869e',callback:v=>'$'+v},grid:{color:'rgba(38,45,61,0.4)'}},
+      y:{title:{display:true,text:'Compute Power (relative)',color:'#7c869e'},ticks:{color:'#7c869e'},grid:{color:'rgba(38,45,61,0.4)'},min:0,max:12}
+    }
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Score Labs – GPU & AI Infrastructure Pricing Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0c0f14;
+  --surface: #151922;
+  --surface2: #1c2230;
+  --border: #2a3142;
+  --text: #e2e6ef;
+  --text2: #8892a6;
+  --accent: #4af0c0;
+  --accent2: #6c5ce7;
+  --warn: #fd7e14;
+  --red: #ff6b6b;
+  --blue: #54a0ff;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
+.container { max-width:1280px; margin:0 auto; padding:24px 20px; }
+
+/* Header */
+.header { text-align:center; margin-bottom:48px; padding:48px 0 32px; border-bottom:1px solid var(--border); }
+.header h1 { font-family:'Space Mono',monospace; font-size:2.2rem; letter-spacing:-1px; margin-bottom:8px; }
+.header h1 span { color:var(--accent); }
+.header p { color:var(--text2); font-size:1rem; max-width:600px; margin:0 auto; }
+
+/* Section */
+.section { margin-bottom:48px; }
+.section-title { font-family:'Space Mono',monospace; font-size:1.3rem; margin-bottom:20px; padding-left:16px; border-left:3px solid var(--accent); }
+.section-subtitle { color:var(--text2); font-size:0.9rem; margin-bottom:16px; }
+
+/* Cards */
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+@media(max-width:768px) { .grid-2,.grid-3 { grid-template-columns:1fr; } }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; }
+.card-label { font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; color:var(--text2); margin-bottom:6px; }
+.card-value { font-family:'Space Mono',monospace; font-size:1.8rem; font-weight:700; }
+.card-note { font-size:0.8rem; color:var(--text2); margin-top:4px; }
+
+/* Tables */
+table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+table th { text-align:left; padding:12px 14px; background:var(--surface2); color:var(--accent); font-weight:600; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; border-bottom:2px solid var(--border); }
+table td { padding:10px 14px; border-bottom:1px solid var(--border); }
+table tr:hover td { background:rgba(74,240,192,0.03); }
+.tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.72rem; font-weight:600; }
+.tag-green { background:rgba(74,240,192,0.15); color:var(--accent); }
+.tag-purple { background:rgba(108,92,231,0.15); color:var(--accent2); }
+.tag-orange { background:rgba(253,126,20,0.15); color:var(--warn); }
+.tag-blue { background:rgba(84,160,255,0.15); color:var(--blue); }
+.tag-red { background:rgba(255,107,107,0.15); color:var(--red); }
+.highlight-row td { background:rgba(74,240,192,0.05); }
+
+/* Charts */
+.chart-wrap { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:20px; }
+.chart-wrap h3 { font-size:0.95rem; margin-bottom:16px; font-weight:600; }
+canvas { max-height:360px; }
+
+/* Pricing Model Section */
+.pricing-tier { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:16px; position:relative; overflow:hidden; }
+.pricing-tier::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; }
+.tier-basic::before { background:var(--blue); }
+.tier-pro::before { background:var(--accent); }
+.tier-enterprise::before { background:var(--accent2); }
+.pricing-tier h3 { font-size:1.1rem; margin-bottom:4px; }
+.pricing-tier .price { font-family:'Space Mono',monospace; font-size:1.5rem; font-weight:700; margin:8px 0; }
+.pricing-tier ul { list-style:none; padding:0; }
+.pricing-tier li { padding:4px 0; font-size:0.85rem; color:var(--text2); }
+.pricing-tier li::before { content:'✓ '; color:var(--accent); font-weight:700; }
+
+/* Insight boxes */
+.insight { background:linear-gradient(135deg, rgba(74,240,192,0.08), rgba(108,92,231,0.06)); border:1px solid rgba(74,240,192,0.2); border-radius:12px; padding:20px 24px; margin:20px 0; }
+.insight strong { color:var(--accent); }
+
+/* Value-add section */
+.addon-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; }
+.addon-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; transition:border-color 0.2s; }
+.addon-card:hover { border-color:var(--accent); }
+.addon-icon { font-size:1.6rem; margin-bottom:10px; }
+.addon-card h4 { font-size:0.95rem; margin-bottom:6px; }
+.addon-card p { font-size:0.82rem; color:var(--text2); }
+.addon-price { font-family:'Space Mono',monospace; color:var(--accent); font-weight:700; margin-top:8px; font-size:0.9rem; }
+
+.divider { border:none; border-top:1px solid var(--border); margin:40px 0; }
+
+/* Key drivers */
+.driver-bar { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+.driver-label { width:140px; font-size:0.82rem; flex-shrink:0; }
+.driver-fill { height:24px; border-radius:4px; position:relative; }
+.driver-pct { font-family:'Space Mono',monospace; font-size:0.75rem; margin-left:8px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- HEADER -->
+<div class="header">
+  <h1><span>Score Labs</span> GPU Pricing Intelligence</h1>
+  <p>Competitive analysis across 10+ cloud GPU providers, with inference benchmarks and a recommended pricing model for Score Labs.</p>
+</div>
+
+<!-- EXEC SUMMARY -->
+<div class="section">
+  <h2 class="section-title">Executive Summary</h2>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-label">Market Price Range (H100)</div>
+      <div class="card-value" style="color:var(--accent)">$2.50–$3.99<small style="font-size:0.6em">/hr</small></div>
+      <div class="card-note">Hydra Host wholesale vs AIServe.Farm on-demand</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Cheapest GPU Entry Point</div>
+      <div class="card-value" style="color:var(--warn)">$0.24<small style="font-size:0.6em">/hr</small></div>
+      <div class="card-note">RTX 3090 via Hydra Host (wholesale)</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Best Perf/$ (235B Inference)</div>
+      <div class="card-value" style="color:var(--accent2)">WandB</div>
+      <div class="card-note">42.7 TPS avg at $0.0043/request (bf16)</div>
+    </div>
+  </div>
+</div>
+
+<!-- TABLE 1: GPU HARDWARE PRICING -->
+<div class="section">
+  <h2 class="section-title">1. GPU Hardware Pricing Comparison</h2>
+  <p class="section-subtitle">Hourly rates across providers. Hydra Host is the only provider publishing wholesale bare-metal rates across all SKUs.</p>
+  <div class="card" style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr><th>GPU Model</th><th>Hydra Host</th><th>AIServe.Farm</th><th>Other Providers</th><th>Billing</th><th>Score Labs Opportunity</th></tr>
+      </thead>
+      <tbody>
+        <tr class="highlight-row">
+          <td><strong>NVIDIA B200</strong></td><td>$3.50–$5.00/hr</td><td>—</td><td>Lambda, CoreWeave (not published)</td><td>Wholesale</td><td><span class="tag tag-green">High Margin</span></td>
+        </tr>
+        <tr class="highlight-row">
+          <td><strong>NVIDIA H200</strong></td><td>$2.50–$3.20/hr</td><td>—</td><td>Lambda, Together AI (not published)</td><td>Wholesale</td><td><span class="tag tag-green">High Margin</span></td>
+        </tr>
+        <tr>
+          <td><strong>H100 80GB</strong></td><td>—</td><td>$3.99/hr</td><td>RunPod, Paperspace, rLoop: variable</td><td>Per-minute</td><td><span class="tag tag-orange">Competitive</span></td>
+        </tr>
+        <tr>
+          <td><strong>GH200</strong></td><td>$2.75–$4.99/hr</td><td>—</td><td>—</td><td>Wholesale</td><td><span class="tag tag-green">High Margin</span></td>
+        </tr>
+        <tr>
+          <td><strong>A100 80GB</strong></td><td>—</td><td>$1.99/hr</td><td>Paperspace (save up to 70%)</td><td>Per-minute</td><td><span class="tag tag-blue">Mid Margin</span></td>
+        </tr>
+        <tr>
+          <td><strong>A100 40GB</strong></td><td>—</td><td>$1.49/hr</td><td>—</td><td>Per-minute</td><td><span class="tag tag-blue">Mid Margin</span></td>
+        </tr>
+        <tr>
+          <td><strong>RTX 5090</strong></td><td>$0.70/hr</td><td>—</td><td>—</td><td>Wholesale</td><td><span class="tag tag-green">High Margin</span></td>
+        </tr>
+        <tr>
+          <td><strong>RTX 4090</strong></td><td>$0.40–$0.65/hr</td><td>$0.79/hr</td><td>Vast.ai: auction pricing</td><td>Wholesale / Per-min</td><td><span class="tag tag-orange">Competitive</span></td>
+        </tr>
+        <tr>
+          <td><strong>RTX A6000</strong></td><td>$0.52–$0.65/hr</td><td>—</td><td>—</td><td>Wholesale</td><td><span class="tag tag-blue">Mid Margin</span></td>
+        </tr>
+        <tr>
+          <td><strong>L40S</strong></td><td>$0.70–$1.45/hr</td><td>—</td><td>—</td><td>Wholesale</td><td><span class="tag tag-blue">Mid Margin</span></td>
+        </tr>
+        <tr>
+          <td><strong>L40</strong></td><td>$0.55–$0.90/hr</td><td>—</td><td>—</td><td>Wholesale</td><td><span class="tag tag-blue">Mid Margin</span></td>
+        </tr>
+        <tr>
+          <td><strong>RTX 3090</strong></td><td>$0.24–$0.35/hr</td><td>—</td><td>—</td><td>Wholesale</td><td><span class="tag tag-purple">Budget Tier</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CHART: Price Comparison Bar -->
+<div class="section">
+  <div class="chart-wrap">
+    <h3>GPU Hourly Price Comparison (Mid-Range Estimate)</h3>
+    <canvas id="gpuPriceChart"></canvas>
+  </div>
+</div>
+
+<!-- TABLE 2: INFERENCE PROVIDER BENCHMARKS -->
+<div class="section">
+  <h2 class="section-title">2. Inference Provider Benchmarks</h2>
+  <p class="section-subtitle">OpenRouter data for Qwen3-235B (large model) and Qwen3-30B (small model) inference across providers.</p>
+
+  <div class="grid-2">
+    <div class="card" style="overflow-x:auto">
+      <h3 style="margin-bottom:12px; font-size:0.95rem;">Qwen3-235B (Large Model) – by Provider</h3>
+      <table>
+        <thead><tr><th>Provider</th><th>Avg Cost</th><th>Avg TPS</th><th>Quant</th><th>Latency (TTFT)</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr><td>WandB</td><td>$0.0043</td><td style="color:var(--accent);font-weight:700;">42.7</td><td>bf16</td><td>2,379 ms</td><td><span class="tag tag-green">Best Value</span></td></tr>
+          <tr><td>Cerebras</td><td>$0.0320</td><td>31.0</td><td>fp16</td><td>3,138 ms</td><td><span class="tag tag-red">Expensive</span></td></tr>
+          <tr><td>DeepInfra</td><td>$0.0038</td><td>20.7</td><td>fp8</td><td>3,633 ms</td><td><span class="tag tag-green">Good Value</span></td></tr>
+          <tr><td>Nebius</td><td>$0.0134</td><td>13.8</td><td>fp8</td><td>7,537 ms</td><td><span class="tag tag-orange">Mid</span></td></tr>
+          <tr><td>Parasail</td><td>$0.0050</td><td>8.7</td><td>fp8</td><td>7,023 ms</td><td><span class="tag tag-blue">Decent</span></td></tr>
+          <tr><td>AtlasCloud</td><td>$0.0049</td><td>5.6</td><td>fp8</td><td>8,937 ms</td><td><span class="tag tag-orange">Slow</span></td></tr>
+          <tr><td>Novita</td><td>$0.0063</td><td>4.3</td><td>fp8</td><td>24,043 ms</td><td><span class="tag tag-red">Very Slow</span></td></tr>
+          <tr><td>SiliconFlow</td><td>$0.0070</td><td>2.5</td><td>fp8</td><td>25,009 ms</td><td><span class="tag tag-red">Very Slow</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card" style="overflow-x:auto">
+      <h3 style="margin-bottom:12px; font-size:0.95rem;">Qwen3-30B (Small Model) – by Provider</h3>
+      <table>
+        <thead><tr><th>Provider</th><th>Avg Cost</th><th>Avg TPS</th><th>Avg Latency</th><th>Requests</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr><td>AtlasCloud</td><td>$0.0060</td><td>13.6</td><td>12,918 ms</td><td>4</td><td><span class="tag tag-orange">Variable</span></td></tr>
+          <tr><td>SiliconFlow</td><td>$0.0049</td><td>11.5</td><td>8,705 ms</td><td>5</td><td><span class="tag tag-blue">Budget</span></td></tr>
+          <tr><td>Nebius</td><td>$0.0113</td><td>8.5</td><td>7,190 ms</td><td>7</td><td><span class="tag tag-orange">Pricey</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- CHART: TPS vs Cost scatter -->
+<div class="section">
+  <div class="grid-2">
+    <div class="chart-wrap">
+      <h3>235B Inference: TPS vs Cost per Request</h3>
+      <canvas id="tpsCostChart"></canvas>
+    </div>
+    <div class="chart-wrap">
+      <h3>235B Inference: Time to First Token (ms)</h3>
+      <canvas id="ttftChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- KEY PRICING DRIVERS -->
+<div class="section">
+  <h2 class="section-title">3. Key Pricing Drivers</h2>
+  <div class="card">
+    <div style="margin-bottom:24px;">
+      <div class="driver-bar">
+        <div class="driver-label"><strong>GPU Tier / VRAM</strong></div>
+        <div class="driver-fill" style="width:90%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div>
+        <div class="driver-pct">90%</div>
+      </div>
+      <div class="driver-bar">
+        <div class="driver-label"><strong>Quantization</strong></div>
+        <div class="driver-fill" style="width:75%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div>
+        <div class="driver-pct">75%</div>
+      </div>
+      <div class="driver-bar">
+        <div class="driver-label"><strong>Billing Model</strong></div>
+        <div class="driver-fill" style="width:65%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div>
+        <div class="driver-pct">65%</div>
+      </div>
+      <div class="driver-bar">
+        <div class="driver-label"><strong>Deployment Type</strong></div>
+        <div class="driver-fill" style="width:60%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div>
+        <div class="driver-pct">60%</div>
+      </div>
+      <div class="driver-bar">
+        <div class="driver-label"><strong>Compliance/Certs</strong></div>
+        <div class="driver-fill" style="width:45%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div>
+        <div class="driver-pct">45%</div>
+      </div>
+      <div class="driver-bar">
+        <div class="driver-label"><strong>Region / Latency</strong></div>
+        <div class="driver-fill" style="width:40%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div>
+        <div class="driver-pct">40%</div>
+      </div>
+    </div>
+    <div class="insight">
+      <strong>Key Insight:</strong> GPU tier and VRAM are the dominant pricing factors — H100/B200 class GPUs command 5–15× the hourly rate of consumer RTX cards. Quantization (bf16 vs fp8 vs fp16) heavily impacts inference cost per token. Wholesale bare-metal is 30–50% cheaper than on-demand managed services but requires more customer sophistication.
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- SCORE LABS PRICING MODEL -->
+<div class="section">
+  <h2 class="section-title">4. Recommended Score Labs Pricing Model</h2>
+  <p class="section-subtitle">Three-tier structure that undercuts managed providers while maintaining healthy margins above wholesale.</p>
+
+  <div class="grid-3">
+    <div class="pricing-tier tier-basic">
+      <h3>🔹 Starter</h3>
+      <div class="price" style="color:var(--blue)">Cost + 15%</div>
+      <p style="font-size:0.82rem;color:var(--text2);margin-bottom:12px;">Self-service GPU access</p>
+      <ul>
+        <li>RTX 3090 / 4090 / A6000</li>
+        <li>Per-minute billing</li>
+        <li>Basic dashboard & monitoring</li>
+        <li>Community support</li>
+        <li>Single-region deployment</li>
+      </ul>
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">
+        <div style="font-size:0.78rem;color:var(--text2)">Example: RTX 4090</div>
+        <div style="font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--blue)">$0.55–$0.75/hr</div>
+      </div>
+    </div>
+    <div class="pricing-tier tier-pro" style="border-color:var(--accent)">
+      <h3>🔷 Professional</h3>
+      <div class="price" style="color:var(--accent)">Cost + 25%</div>
+      <p style="font-size:0.82rem;color:var(--text2);margin-bottom:12px;">Managed inference & training</p>
+      <ul>
+        <li>H100 / H200 / L40S</li>
+        <li>Per-second billing</li>
+        <li>SLA-backed uptime (99.9%)</li>
+        <li>Priority support (8hr response)</li>
+        <li>Multi-region + auto-scaling</li>
+        <li>Model deployment tooling</li>
+      </ul>
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">
+        <div style="font-size:0.78rem;color:var(--text2)">Example: H100 80GB</div>
+        <div style="font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--accent)">$3.10–$3.50/hr</div>
+      </div>
+    </div>
+    <div class="pricing-tier tier-enterprise">
+      <h3>🔶 Enterprise</h3>
+      <div class="price" style="color:var(--accent2)">Custom</div>
+      <p style="font-size:0.82rem;color:var(--text2);margin-bottom:12px;">Dedicated clusters & co-engineering</p>
+      <ul>
+        <li>B200 / GH200 / GB300 clusters</li>
+        <li>Reserved capacity discounts</li>
+        <li>Dedicated account manager</li>
+        <li>SOC 2 / ISO 27001 compliance</li>
+        <li>Private networking & bare metal</li>
+        <li>Custom SLAs (99.99%)</li>
+      </ul>
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">
+        <div style="font-size:0.78rem;color:var(--text2)">Example: B200 cluster</div>
+        <div style="font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--accent2)">$4.00–$5.50/hr</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="insight" style="margin-top:24px;">
+    <strong>Pricing Rationale:</strong> Score Labs sources at Hydra Host wholesale rates and adds a 15–30% margin depending on tier. This positions Score Labs 20–40% below managed providers (AIServe.Farm, Paperspace) while still above raw wholesale, capturing value through tooling, support, and compliance layers.
+  </div>
+</div>
+
+<!-- QUICK REFERENCE: Score Labs Price Card -->
+<div class="section">
+  <h2 class="section-title">5. Score Labs Suggested Price Card</h2>
+  <div class="card" style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr><th>GPU</th><th>Wholesale Cost</th><th>Score Starter</th><th>Score Pro</th><th>Market (AIServe/Others)</th><th>Score Savings vs Market</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>RTX 3090</td><td>$0.24–$0.35</td><td>$0.30–$0.40</td><td>$0.35–$0.45</td><td>N/A (niche)</td><td>—</td></tr>
+        <tr><td>RTX 4090</td><td>$0.40–$0.65</td><td>$0.55–$0.75</td><td>$0.60–$0.80</td><td>$0.79 (AIServe)</td><td><span class="tag tag-green">↓5–30%</span></td></tr>
+        <tr><td>RTX 5090</td><td>$0.70</td><td>$0.80</td><td>$0.88</td><td>Not widely avail.</td><td><span class="tag tag-green">First mover</span></td></tr>
+        <tr><td>RTX A6000</td><td>$0.52–$0.65</td><td>$0.65–$0.75</td><td>$0.70–$0.80</td><td>N/A</td><td>—</td></tr>
+        <tr><td>L40 / L40S</td><td>$0.55–$1.45</td><td>$0.70–$1.65</td><td>$0.80–$1.80</td><td>Not widely published</td><td><span class="tag tag-blue">Differentiated</span></td></tr>
+        <tr class="highlight-row"><td><strong>A100 40GB</strong></td><td>~$1.00 est.</td><td>$1.15</td><td>$1.25</td><td>$1.49 (AIServe)</td><td><span class="tag tag-green">↓16–23%</span></td></tr>
+        <tr class="highlight-row"><td><strong>A100 80GB</strong></td><td>~$1.50 est.</td><td>$1.72</td><td>$1.88</td><td>$1.99 (AIServe)</td><td><span class="tag tag-green">↓6–14%</span></td></tr>
+        <tr class="highlight-row"><td><strong>H100 80GB</strong></td><td>~$2.50 est.</td><td>$2.88</td><td>$3.13</td><td>$3.99 (AIServe)</td><td><span class="tag tag-green">↓22–28%</span></td></tr>
+        <tr class="highlight-row"><td><strong>H200</strong></td><td>$2.50–$3.20</td><td>$3.00–$3.70</td><td>$3.30–$4.00</td><td>Not widely published</td><td><span class="tag tag-green">First mover</span></td></tr>
+        <tr><td><strong>B200</strong></td><td>$3.50–$5.00</td><td>$4.00–$5.75</td><td>$4.40–$6.25</td><td>Lambda/CoreWeave (custom)</td><td><span class="tag tag-green">Transparent</span></td></tr>
+        <tr><td><strong>GH200</strong></td><td>$2.75–$4.99</td><td>$3.15–$5.75</td><td>$3.45–$6.25</td><td>Not widely avail.</td><td><span class="tag tag-green">First mover</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- VALUE ADDED SERVICES -->
+<div class="section">
+  <h2 class="section-title">6. Value-Added Services & Add-Ons</h2>
+  <p class="section-subtitle">Revenue multipliers Score Labs can layer on top of base GPU pricing.</p>
+
+  <div class="addon-grid">
+    <div class="addon-card">
+      <div class="addon-icon">🛡️</div>
+      <h4>Compliance-as-a-Service</h4>
+      <p>SOC 2, ISO 27001, HIPAA-ready environments with audit trail logging and data residency controls.</p>
+      <div class="addon-price">+15–25% premium</div>
+    </div>
+    <div class="addon-card">
+      <div class="addon-icon">🚀</div>
+      <h4>Managed Inference Platform</h4>
+      <p>One-click model deployment, auto-scaling, A/B testing, and optimized serving engines (vLLM, TGI, TRT-LLM).</p>
+      <div class="addon-price">+$0.50–$2.00/hr per GPU</div>
+    </div>
+    <div class="addon-card">
+      <div class="addon-icon">📊</div>
+      <h4>Observability & Monitoring</h4>
+      <p>GPU utilization dashboards, cost analytics, inference latency tracking, alerting, and usage reports.</p>
+      <div class="addon-price">+$99–$499/mo</div>
+    </div>
+    <div class="addon-card">
+      <div class="addon-icon">🔧</div>
+      <h4>Fine-Tuning-as-a-Service</h4>
+      <p>Managed LoRA/QLoRA fine-tuning pipelines with dataset prep, training orchestration, and eval.</p>
+      <div class="addon-price">+$500–$5,000 per job</div>
+    </div>
+    <div class="addon-card">
+      <div class="addon-icon">💾</div>
+      <h4>Persistent Storage & Caching</h4>
+      <p>High-speed NVMe block storage, model caching, and S3-compatible object storage co-located with GPUs.</p>
+      <div class="addon-price">+$0.05–$0.15/GB/mo</div>
+    </div>
+    <div class="addon-card">
+      <div class="addon-icon">🤝</div>
+      <h4>Dedicated Support & Co-Engineering</h4>
+      <p>Named account engineer, architecture reviews, performance optimization, and quarterly business reviews.</p>
+      <div class="addon-price">+$2,000–$10,000/mo</div>
+    </div>
+    <div class="addon-card">
+      <div class="addon-icon">🌐</div>
+      <h4>Multi-Region / Edge Deployment</h4>
+      <p>Deploy inference endpoints across Americas, EMEA, and APAC with geo-routing and failover.</p>
+      <div class="addon-price">+20% of base GPU cost</div>
+    </div>
+    <div class="addon-card">
+      <div class="addon-icon">🔐</div>
+      <h4>Private Networking & VPC</h4>
+      <p>Dedicated VLAN, VPN peering, private endpoints, and InfiniBand interconnect for clusters.</p>
+      <div class="addon-price">+$500–$3,000/mo</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- COMPETITIVE POSITIONING -->
+<div class="section">
+  <h2 class="section-title">7. Competitive Positioning Summary</h2>
+  <div class="card" style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr><th>Dimension</th><th>Vast.ai</th><th>RunPod</th><th>AIServe.Farm</th><th>Lambda</th><th>CoreWeave</th><th style="color:var(--accent)">Score Labs (Target)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Price Level</strong></td><td>Lowest (auction)</td><td>Mid</td><td>Mid-High</td><td>Enterprise</td><td>Enterprise</td><td style="color:var(--accent)">Low-Mid</td></tr>
+        <tr><td><strong>Reliability</strong></td><td>Interruptible</td><td>Good</td><td>Good</td><td>High</td><td>Very High</td><td style="color:var(--accent)">High (SLA-backed)</td></tr>
+        <tr><td><strong>Compliance</strong></td><td>ISO 27001</td><td>SOC 2 II</td><td>SOC 2</td><td>SOC 2 II</td><td>N/A</td><td style="color:var(--accent)">SOC 2 + HIPAA ready</td></tr>
+        <tr><td><strong>Billing Granularity</strong></td><td>Auction</td><td>Serverless</td><td>Per-minute</td><td>Contract</td><td>Contract</td><td style="color:var(--accent)">Per-second</td></tr>
+        <tr><td><strong>GPU Breadth</strong></td><td>10K+ GPUs</td><td>30+ SKUs</td><td>4 SKUs</td><td>5 SKUs</td><td>3 SKUs</td><td style="color:var(--accent)">10+ SKUs (via Hydra)</td></tr>
+        <tr><td><strong>Target Customer</strong></td><td>Cost-conscious</td><td>Startups</td><td>Individuals</td><td>Gov/Enterprise</td><td>Frontier labs</td><td style="color:var(--accent)">SMB → Mid-Enterprise</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="insight">
+    <strong>Score Labs Sweet Spot:</strong> The market has a clear gap between budget/unreliable providers (Vast.ai) and expensive enterprise players (Lambda, CoreWeave). Score Labs can own the "reliable mid-market" — offering near-wholesale pricing with managed-service quality, per-second billing, and compliance add-ons that cost-conscious but quality-demanding customers need.
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// Chart 1: GPU Price Comparison
+const ctx1 = document.getElementById('gpuPriceChart').getContext('2d');
+new Chart(ctx1, {
+  type: 'bar',
+  data: {
+    labels: ['RTX 3090','RTX 4090','RTX 5090','RTX A6000','L40','L40S','A100 40GB','A100 80GB','H100 80GB','H200','GH200','B200'],
+    datasets: [
+      { label:'Hydra Host (Wholesale Mid)', data:[0.30,0.53,0.70,0.59,0.73,1.08,null,null,null,2.85,3.87,4.25], backgroundColor:'rgba(74,240,192,0.7)', borderRadius:4 },
+      { label:'AIServe.Farm (On-Demand)', data:[null,0.79,null,null,null,null,1.49,1.99,3.99,null,null,null], backgroundColor:'rgba(108,92,231,0.7)', borderRadius:4 },
+      { label:'Score Labs Pro (Recommended)', data:[0.40,0.70,0.88,0.75,0.85,1.30,1.25,1.88,3.13,3.65,4.85,5.33], backgroundColor:'rgba(253,126,20,0.7)', borderRadius:4 }
+    ]
+  },
+  options: {
+    responsive:true,
+    plugins:{ legend:{ labels:{ color:'#8892a6', font:{size:11} } } },
+    scales:{
+      x:{ ticks:{color:'#8892a6',font:{size:10}}, grid:{color:'rgba(42,49,66,0.5)'} },
+      y:{ ticks:{color:'#8892a6',callback:v=>'$'+v}, grid:{color:'rgba(42,49,66,0.5)'}, title:{display:true,text:'$/hour',color:'#8892a6'} }
+    }
+  }
+});
+
+// Chart 2: TPS vs Cost (235B)
+const ctx2 = document.getElementById('tpsCostChart').getContext('2d');
+const providers235 = [
+  {x:0.0043,y:42.7,label:'WandB',r:10},
+  {x:0.0320,y:31.0,label:'Cerebras',r:6},
+  {x:0.0038,y:20.7,label:'DeepInfra',r:10},
+  {x:0.0134,y:13.8,label:'Nebius',r:6},
+  {x:0.0050,y:8.7,label:'Parasail',r:7},
+  {x:0.0049,y:5.6,label:'AtlasCloud',r:5},
+  {x:0.0063,y:4.3,label:'Novita',r:5},
+  {x:0.0070,y:2.5,label:'SiliconFlow',r:5}
+];
+new Chart(ctx2, {
+  type:'bubble',
+  data:{
+    datasets:[{
+      data:providers235.map(p=>({x:p.x,y:p.y,r:p.r})),
+      backgroundColor: providers235.map((_,i)=>[
+        'rgba(74,240,192,0.7)','rgba(255,107,107,0.7)','rgba(84,160,255,0.7)',
+        'rgba(253,126,20,0.7)','rgba(108,92,231,0.6)','rgba(150,150,170,0.6)',
+        'rgba(150,150,170,0.5)','rgba(150,150,170,0.5)'
+      ][i]),
+      borderWidth:0
+    }]
+  },
+  options:{
+    responsive:true,
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{label:(_,ctx)=>{const p=providers235[ctx.dataIndex];return `${p.label}: ${p.y} TPS, $${p.x.toFixed(4)}/req`;}}}
+    },
+    scales:{
+      x:{title:{display:true,text:'Avg Cost / Request ($)',color:'#8892a6'},ticks:{color:'#8892a6',callback:v=>'$'+v.toFixed(3)},grid:{color:'rgba(42,49,66,0.5)'}},
+      y:{title:{display:true,text:'Tokens/Second (TPS)',color:'#8892a6'},ticks:{color:'#8892a6'},grid:{color:'rgba(42,49,66,0.5)'}}
+    }
+  }
+});
+
+// Chart 3: TTFT
+const ctx3 = document.getElementById('ttftChart').getContext('2d');
+const ttftData = [
+  {name:'WandB',val:2379},{name:'Cerebras',val:3138},{name:'DeepInfra',val:3633},
+  {name:'Nebius',val:7537},{name:'Parasail',val:7023},{name:'AtlasCloud',val:8937},
+  {name:'Novita',val:24043},{name:'SiliconFlow',val:25009}
+];
+new Chart(ctx3, {
+  type:'bar',
+  data:{
+    labels:ttftData.map(d=>d.name),
+    datasets:[{
+      data:ttftData.map(d=>d.val),
+      backgroundColor:ttftData.map(d=>d.val<5000?'rgba(74,240,192,0.7)':d.val<10000?'rgba(253,126,20,0.7)':'rgba(255,107,107,0.7)'),
+      borderRadius:4
+    }]
+  },
+  options:{
+    indexAxis:'y',
+    responsive:true,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{ticks:{color:'#8892a6',callback:v=>v/1000+'s'},grid:{color:'rgba(42,49,66,0.5)'},title:{display:true,text:'Time to First Token (ms)',color:'#8892a6'}},
+      y:{ticks:{color:'#8892a6',font:{size:11}},grid:{display:false}}
+    }
+  }
+});
+</script>
+</body>
+</html>
