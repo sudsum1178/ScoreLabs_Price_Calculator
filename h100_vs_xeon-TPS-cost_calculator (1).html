@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GPU vs CPU CapEx-OpEx Estimator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0B0E14;
+    --surface: #131720;
+    --surface2: #1A1F2B;
+    --border: #252B3A;
+    --text: #E8ECF4;
+    --text-dim: #7A8399;
+    --h100-primary: #F97316;
+    --h100-light: #FDBA74;
+    --h100-bg: rgba(249,115,22,0.08);
+    --gen6-primary: #22D3EE;
+    --gen6-light: #67E8F9;
+    --gen6-bg: rgba(34,211,238,0.08);
+    --capex: #A78BFA;
+    --power: #FBBF24;
+    --input-bg: #0D1117;
+    --input-border: #30363D;
+    --input-focus: #58A6FF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    padding: 20px 16px;
+  }
+
+  .container {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 14px;
+  }
+
+  header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--h100-light), var(--gen6-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  header .subtitle {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin-top: 3px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Callout ── */
+  .callout-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    margin-top: -10px;
+    margin-bottom: 8px;
+    padding-right: 24px;
+    animation: calloutPop 0.8s 0.6s ease both;
+  }
+
+  @keyframes calloutPop {
+    0% { opacity: 0; transform: scale(0.7) translateY(10px); }
+    60% { opacity: 1; transform: scale(1.05) translateY(-2px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  @keyframes pulseShadow {
+    0%, 100% { box-shadow: 0 0 16px rgba(34,211,238,0.2), 0 0 32px rgba(34,211,238,0.05); }
+    50% { box-shadow: 0 0 24px rgba(34,211,238,0.35), 0 0 48px rgba(34,211,238,0.1); }
+  }
+
+  .callout-bracket {
+    position: absolute;
+    right: 0;
+    top: -44px;
+    width: 24px;
+    height: 96px;
+  }
+
+  .callout-bracket path {
+    fill: none;
+    stroke: var(--gen6-primary);
+    stroke-width: 2;
+    stroke-dasharray: 6 4;
+    opacity: 0.6;
+  }
+
+  .callout-bubble {
+    position: relative;
+    background: linear-gradient(135deg, rgba(34,211,238,0.15), rgba(34,211,238,0.06));
+    border: 2px solid var(--gen6-primary);
+    border-radius: 12px;
+    padding: 8px 18px;
+    text-align: center;
+    animation: pulseShadow 3s ease-in-out infinite;
+    margin-right: 28px;
+  }
+
+  .callout-bubble::before {
+    content: '';
+    position: absolute;
+    right: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0; height: 0;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-left: 10px solid var(--gen6-primary);
+  }
+
+  .callout-bubble::after {
+    content: '';
+    position: absolute;
+    right: -7px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0; height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-left: 8px solid rgba(34,211,238,0.12);
+  }
+
+  .callout-big {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    font-size: 1.4rem;
+    color: var(--gen6-light);
+    line-height: 1;
+    letter-spacing: -0.5px;
+  }
+
+  .callout-sub {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    color: var(--gen6-primary);
+    margin-top: 1px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+
+  /* ── Bars ── */
+  .breakdown-section {
+    margin-bottom: 0;
+    animation: fadeUp 0.6s 0.25s ease both;
+  }
+
+  .section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .bar-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 700;
+    width: 100px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .bar-row.h100 .bar-label { color: var(--h100-primary); }
+  .bar-row.gen6 .bar-label { color: var(--gen6-primary); }
+
+  .bar-track {
+    flex: 1;
+    height: 44px;
+    background: var(--surface);
+    border-radius: 7px;
+    overflow: hidden;
+    display: flex;
+    position: relative;
+    border: 1px solid var(--border);
+  }
+
+  .bar-seg {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #fff;
+    position: relative;
+    transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    min-width: 54px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .bar-seg.capex { background: var(--capex); }
+  .bar-seg.power { background: var(--power); color: #1a1a1a; }
+
+  .bar-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.35rem;
+    font-weight: 700;
+    min-width: 90px;
+    text-align: left;
+    flex-shrink: 0;
+  }
+  .bar-row.h100 .bar-value { color: var(--h100-primary); }
+  .bar-row.gen6 .bar-value { color: var(--gen6-light); }
+
+  .bar-unit {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--text-dim);
+  }
+
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 28px;
+    margin-top: 12px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+  }
+  .legend-dot.capex { background: var(--capex); }
+  .legend-dot.power { background: var(--power); }
+
+  /* ── Compact Input Table ── */
+  .input-section {
+    animation: fadeUp 0.6s 0.15s ease both;
+    margin-bottom: 16px;
+  }
+
+  .input-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--surface);
+    table-layout: fixed;
+  }
+
+  .input-table thead th {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 8px 10px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .input-table thead th:first-child {
+    text-align: left;
+    color: var(--text-dim);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    width: 42%;
+  }
+  .input-table thead th.h100-header {
+    color: var(--h100-primary);
+    background: var(--h100-bg);
+    border-left: 1px solid var(--border);
+    width: 29%;
+  }
+  .input-table thead th.gen6-header {
+    color: var(--gen6-primary);
+    background: var(--gen6-bg);
+    border-left: 1px solid var(--border);
+    width: 29%;
+  }
+
+  .input-table tbody td {
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    vertical-align: middle;
+  }
+  .input-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+  .input-table tbody td:first-child {
+    text-align: left;
+    padding: 5px 12px;
+  }
+  .input-table tbody td:nth-child(2) {
+    border-left: 1px solid var(--border);
+  }
+  .input-table tbody td:nth-child(3) {
+    border-left: 1px solid var(--border);
+  }
+
+  .input-table .var-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.2;
+  }
+
+  .input-table .var-unit {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    line-height: 1.2;
+  }
+
+  .input-table input {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    font-size: 0.9rem;
+    width: 100%;
+    max-width: 110px;
+    text-align: center;
+    padding: 4px 6px;
+    border-radius: 6px;
+    border: 1px solid var(--input-border);
+    background: var(--input-bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .input-table input:focus {
+    border-color: var(--input-focus);
+    box-shadow: 0 0 0 2px rgba(88,166,255,0.15);
+  }
+
+  .input-table input.h100-input { color: var(--h100-light); }
+  .input-table input.gen6-input { color: var(--gen6-light); }
+
+  .input-table .shared-row td {
+    background: var(--surface2);
+  }
+  .input-table .shared-row .shared-input-cell {
+    text-align: center;
+  }
+
+  .reset-btn {
+    display: block;
+    margin: 8px auto 0;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 5px 16px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .reset-btn:hover {
+    border-color: var(--input-focus);
+    color: var(--text);
+    background: var(--surface2);
+  }
+
+  /* ── Formula row ── */
+  .formula-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 12px 0 12px;
+    flex-wrap: wrap;
+    animation: fadeUp 0.6s 0.3s ease both;
+  }
+
+  .formula-chip {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    padding: 5px 10px;
+    border-radius: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  .formula-op {
+    font-family: 'Space Mono', monospace;
+    font-size: 1rem;
+    color: var(--text-dim);
+  }
+
+  @media (max-width: 700px) {
+    .bar-row { flex-wrap: wrap; }
+  }
+
+  .computed-val {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 4px 6px;
+    text-align: center;
+  }
+  .computed-val.h100-computed { color: var(--h100-light); }
+  .computed-val.gen6-computed { color: var(--gen6-light); }
+
+  .throughput-section {
+    animation: fadeUp 0.6s 0.35s ease both;
+    margin-top: 8px;
+  }
+  .eff-bar {
+    min-width: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>H100-SXM vs Gen6-Xeon</h1>
+    <div class="subtitle">GPU vs CPU CapEx–OpEx Estimator</div>
+  </header>
+
+  <!-- COMPACT INPUTS -->
+  <div class="input-section">
+    <table class="input-table">
+      <thead>
+        <tr>
+          <th>Parameter</th>
+          <th class="h100-header">8xH100-SXM</th>
+          <th class="gen6-header">2S-Gen6-Xeon</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div class="var-name">System Price</div><div class="var-unit">USD</div></td>
+          <td><input type="number" id="h100_price" class="h100-input" value="320000" min="0" step="1000"></td>
+          <td><input type="number" id="gen6_price" class="gen6-input" value="35000" min="0" step="1000"></td>
+        </tr>
+        <tr>
+          <td><div class="var-name">CAPEX Amortization</div><div class="var-unit">Years</div></td>
+          <td><input type="number" id="h100_years" class="h100-input" value="3" min="1" max="20" step="1"></td>
+          <td><input type="number" id="gen6_years" class="gen6-input" value="6" min="1" max="20" step="1"></td>
+        </tr>
+        <tr>
+          <td><div class="var-name">IT Power</div><div class="var-unit">kW per system</div></td>
+          <td><input type="number" id="h100_power" class="h100-input" value="10.20" min="0" step="0.1"></td>
+          <td><input type="number" id="gen6_power" class="gen6-input" value="1.00" min="0" step="0.1"></td>
+        </tr>
+        <tr>
+          <td><div class="var-name">Nodes per System</div><div class="var-unit">Count</div></td>
+          <td><input type="number" id="h100_nodes" class="h100-input" value="8" min="1" max="64" step="1"></td>
+          <td><input type="number" id="gen6_nodes" class="gen6-input" value="2" min="1" max="64" step="1"></td>
+        </tr>
+        <tr class="shared-row">
+          <td><div class="var-name">PUE</div><div class="var-unit">Power Usage Effectiveness</div></td>
+          <td colspan="2" class="shared-input-cell"><input type="number" id="shared_pue" value="1.56" min="1" max="3" step="0.01"></td>
+        </tr>
+        <tr class="shared-row">
+          <td><div class="var-name">Electricity Price</div><div class="var-unit">$ per kWh</div></td>
+          <td colspan="2" class="shared-input-cell"><input type="number" id="shared_elec" value="0.14" min="0" max="1" step="0.01"></td>
+        </tr>
+      </tbody>
+    </table>
+    <button class="reset-btn" onclick="resetDefaults()">↺ Reset to Defaults</button>
+  </div>
+
+  <!-- Formula -->
+  <div class="formula-row">
+    <div class="formula-chip">Base cost per hour ($/h)</div>
+    <div class="formula-op">=</div>
+    <div class="formula-chip" style="border-color: var(--capex); color: var(--capex);">CAPEX / h</div>
+    <div class="formula-op">+</div>
+    <div class="formula-chip" style="border-color: var(--power); color: var(--power);">Power / h</div>
+  </div>
+
+  <!-- Stacked Bars -->
+  <div class="breakdown-section">
+    <div class="section-title">Base Cost per Hour (100% Utilization)</div>
+
+    <div class="bar-row h100">
+      <div class="bar-label">1xH100-SXM</div>
+      <div class="bar-track">
+        <div class="bar-seg capex" id="bar_h100_capex" style="width: 84.5346%;">$1.5221</div>
+        <div class="bar-seg power" id="bar_h100_power" style="width: 15.4654%;">$0.28</div>
+      </div>
+      <div class="bar-value" id="bar_h100_total">$1.80<span class="bar-unit">/h</span></div>
+    </div>
+
+    <div class="bar-row gen6">
+      <div class="bar-label">1xGen6-Xeon</div>
+      <div class="bar-track">
+        <div class="bar-seg capex" id="bar_gen6_capex" style="width: 18.4919%;">$0.3330</div>
+        <div class="bar-seg power" id="bar_gen6_power" style="width: 6.06488%;">$0.11</div>
+      </div>
+      <div class="bar-value" id="bar_gen6_total">$0.44<span class="bar-unit">/h</span></div>
+    </div>
+
+    <div class="callout-wrapper">
+      <svg class="callout-bracket" viewBox="0 0 28 108" preserveAspectRatio="none">
+        <path d="M0,2 L20,2 L20,54 M0,106 L20,106 L20,54 L28,54"></path>
+      </svg>
+      <div class="callout-bubble">
+        <div class="callout-big" id="advantage_ratio">4.1×</div>
+        <div class="callout-sub">cheaper</div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot capex"></div>CAPEX Amortization</div>
+      <div class="legend-item"><div class="legend-dot power"></div>Power (IT × PUE × $/kWh)</div>
+    </div>
+  </div>
+
+  <!-- ── Throughput Section ── -->
+  <div class="throughput-section">
+    <div class="section-title" style="margin-top:24px;">Throughput &amp; Cost Efficiency</div>
+    <table class="input-table">
+      <thead>
+        <tr>
+          <th>Parameter</th>
+          <th class="h100-header">1×H100-SXM</th>
+          <th class="gen6-header">1×GNR-AP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div class="var-name">Per-Node (Token/Sec)</div><div class="var-unit">Editable</div></td>
+          <td><input type="number" id="h100_tps" class="h100-input" value="16.5" min="0" step="0.1"></td>
+          <td><input type="number" id="gnr_tps" class="gen6-input" value="15.6" min="0" step="0.1"></td>
+        </tr>
+        <tr>
+          <td><div class="var-name">Per-Node (Token/h)</div><div class="var-unit">= Token/Sec × 3,600</div></td>
+          <td><div class="computed-val h100-computed" id="h100_tph">59,400</div></td>
+          <td><div class="computed-val gen6-computed" id="gnr_tph">56,160</div></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Formula -->
+    <div class="formula-row">
+      <div class="formula-chip">Tokens/$</div>
+      <div class="formula-op">=</div>
+      <div class="formula-chip" style="border-color: var(--gen6-primary); color: var(--gen6-primary);">(Tokens/h)</div>
+      <div class="formula-op">/</div>
+      <div class="formula-chip" style="border-color: var(--capex); color: var(--capex);">(Base Cost $/h)</div>
+    </div>
+
+    <div class="section-title">Tokens per Dollar Cost (Cost includes HW CapEx + Power OpEx)</div>
+
+    <div class="bar-row h100">
+      <div class="bar-label">1×H100-SXM</div>
+      <div class="bar-track">
+        <div class="bar-seg eff-bar h100-eff" id="bar_h100_eff" style="width:50%;background:var(--h100-primary);"></div>
+      </div>
+      <div class="bar-value" id="val_h100_eff" style="min-width:130px;">33,000<span class="bar-unit"> tok/$</span></div>
+    </div>
+
+    <div class="bar-row gen6">
+      <div class="bar-label">1×GNR-AP</div>
+      <div class="bar-track">
+        <div class="bar-seg eff-bar gen6-eff" id="bar_gnr_eff" style="width:50%;background:var(--gen6-primary);"></div>
+      </div>
+      <div class="bar-value" id="val_gnr_eff" style="min-width:130px;">127,636<span class="bar-unit"> tok/$</span></div>
+    </div>
+
+    <div class="callout-wrapper" id="eff-callout">
+      <svg class="callout-bracket" viewBox="0 0 28 108" preserveAspectRatio="none">
+        <path d="M0,2 L20,2 L20,54 M0,106 L20,106 L20,54 L28,54"></path>
+      </svg>
+      <div class="callout-bubble">
+        <div class="callout-big" id="eff_ratio">3.9×</div>
+        <div class="callout-sub">more tokens/$</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var DEFAULTS = {
+  h100_price: 320000,
+  gen6_price: 35000,
+  h100_years: 3,
+  gen6_years: 6,
+  h100_power: 10.20,
+  gen6_power: 1.00,
+  h100_nodes: 8,
+  gen6_nodes: 2,
+  shared_pue: 1.56,
+  shared_elec: 0.14,
+  h100_tps: 16.5,
+  gnr_tps: 15.6
+};
+
+function resetDefaults() {
+  for (var id in DEFAULTS) {
+    document.getElementById(id).value = DEFAULTS[id];
+  }
+  recalc();
+}
+
+function getInputs() {
+  function v(k) { return parseFloat(document.getElementById(k).value) || 0; }
+  return {
+    h100Price:  v('h100_price'),
+    gen6Price:  v('gen6_price'),
+    h100Years:  v('h100_years'),
+    gen6Years:  v('gen6_years'),
+    h100Power:  v('h100_power'),
+    gen6Power:  v('gen6_power'),
+    h100Nodes:  v('h100_nodes'),
+    gen6Nodes:  v('gen6_nodes'),
+    pue:        v('shared_pue'),
+    elec:       v('shared_elec'),
+    h100Tps:    v('h100_tps'),
+    gnrTps:     v('gnr_tps')
+  };
+}
+
+function formatNum(n) {
+  return Math.round(n).toLocaleString('en-US');
+}
+
+function recalc() {
+  var inp = getInputs();
+  var HPY = 8760;
+
+  var h100_totalHours    = inp.h100Years * HPY;
+  var h100_facilityPow   = inp.pue * inp.h100Power;
+  var h100_powerCostNode = h100_facilityPow * inp.elec;
+  var h100_capexPerHrNode = inp.h100Price / h100_totalHours;
+  var h100_powerPerHrNode = h100_powerCostNode;
+  var h100_capexPerUnit  = h100_capexPerHrNode / inp.h100Nodes;
+  var h100_powerPerUnit  = h100_powerPerHrNode / inp.h100Nodes;
+  var h100_baseCostUnit  = h100_capexPerUnit + h100_powerPerUnit;
+
+  var gen6_totalHours    = inp.gen6Years * HPY;
+  var gen6_facilityPow   = inp.pue * inp.gen6Power;
+  var gen6_powerCostNode = gen6_facilityPow * inp.elec;
+  var gen6_capexPerHrNode = inp.gen6Price / gen6_totalHours;
+  var gen6_powerPerHrNode = gen6_powerCostNode;
+  var gen6_capexPerUnit  = gen6_capexPerHrNode / inp.gen6Nodes;
+  var gen6_powerPerUnit  = gen6_powerPerHrNode / inp.gen6Nodes;
+  var gen6_baseCostUnit  = gen6_capexPerUnit + gen6_powerPerUnit;
+
+  var ratio = gen6_baseCostUnit > 0 ? h100_baseCostUnit / gen6_baseCostUnit : 0;
+
+  var maxTotal = Math.max(h100_baseCostUnit, gen6_baseCostUnit);
+  document.getElementById('bar_h100_capex').style.width = (h100_capexPerUnit / maxTotal * 100) + '%';
+  document.getElementById('bar_h100_capex').textContent  = '$' + h100_capexPerUnit.toFixed(4);
+  document.getElementById('bar_h100_power').style.width  = (h100_powerPerUnit / maxTotal * 100) + '%';
+  document.getElementById('bar_h100_power').textContent   = '$' + h100_powerPerUnit.toFixed(2);
+  document.getElementById('bar_h100_total').innerHTML     = '$' + h100_baseCostUnit.toFixed(2) + '<span class="bar-unit">/h</span>';
+
+  document.getElementById('bar_gen6_capex').style.width  = (gen6_capexPerUnit / maxTotal * 100) + '%';
+  document.getElementById('bar_gen6_capex').textContent   = '$' + gen6_capexPerUnit.toFixed(4);
+  document.getElementById('bar_gen6_power').style.width   = (gen6_powerPerUnit / maxTotal * 100) + '%';
+  document.getElementById('bar_gen6_power').textContent    = '$' + gen6_powerPerUnit.toFixed(2);
+  document.getElementById('bar_gen6_total').innerHTML      = '$' + gen6_baseCostUnit.toFixed(2) + '<span class="bar-unit">/h</span>';
+
+  document.getElementById('advantage_ratio').textContent = ratio.toFixed(1) + '\u00d7';
+
+  // ── Throughput & Efficiency ──
+  var h100_tph = inp.h100Tps * 3600;
+  var gnr_tph  = inp.gnrTps * 3600;
+
+  document.getElementById('h100_tph').textContent = formatNum(h100_tph);
+  document.getElementById('gnr_tph').textContent  = formatNum(gnr_tph);
+
+  var h100_tokPerDollar = h100_baseCostUnit > 0 ? h100_tph / h100_baseCostUnit : 0;
+  var gnr_tokPerDollar  = gen6_baseCostUnit > 0 ? gnr_tph / gen6_baseCostUnit : 0;
+
+  var maxEff = Math.max(h100_tokPerDollar, gnr_tokPerDollar);
+  var h100_effPct = maxEff > 0 ? (h100_tokPerDollar / maxEff * 100) : 0;
+  var gnr_effPct  = maxEff > 0 ? (gnr_tokPerDollar / maxEff * 100) : 0;
+
+  document.getElementById('bar_h100_eff').style.width = h100_effPct + '%';
+  document.getElementById('bar_gnr_eff').style.width  = gnr_effPct + '%';
+
+  document.getElementById('val_h100_eff').innerHTML = formatNum(h100_tokPerDollar) + '<span class="bar-unit"> tok/$</span>';
+  document.getElementById('val_gnr_eff').innerHTML  = formatNum(gnr_tokPerDollar) + '<span class="bar-unit"> tok/$</span>';
+
+  var effRatio = h100_tokPerDollar > 0 ? gnr_tokPerDollar / h100_tokPerDollar : 0;
+  document.getElementById('eff_ratio').textContent = effRatio.toFixed(1) + '\u00d7';
+}
+
+var allIds = Object.keys(DEFAULTS);
+for (var i = 0; i < allIds.length; i++) {
+  var el = document.getElementById(allIds[i]);
+  if (el) el.addEventListener('input', recalc);
+}
+
+recalc();
+</script>
+
+</body></html>
